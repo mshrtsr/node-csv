@@ -1,85 +1,6 @@
-'use strict';
 
-Object.defineProperty(exports, '__esModule', { value: true });
-
-class ResizeableBuffer{
-  constructor(size=100){
-    this.size = size;
-    this.length = 0;
-    this.buf = Buffer.allocUnsafe(size);
-  }
-  prepend(val){
-    if(Buffer.isBuffer(val)){
-      const length = this.length + val.length;
-      if(length >= this.size){
-        this.resize();
-        if(length >= this.size){
-          throw Error('INVALID_BUFFER_STATE');
-        }
-      }
-      const buf = this.buf;
-      this.buf = Buffer.allocUnsafe(this.size);
-      val.copy(this.buf, 0);
-      buf.copy(this.buf, val.length);
-      this.length += val.length;
-    }else {
-      const length = this.length++;
-      if(length === this.size){
-        this.resize();
-      }
-      const buf = this.clone();
-      this.buf[0] = val;
-      buf.copy(this.buf,1, 0, length);
-    }
-  }
-  append(val){
-    const length = this.length++;
-    if(length === this.size){
-      this.resize();
-    }
-    this.buf[length] = val;
-  }
-  clone(){
-    return Buffer.from(this.buf.slice(0, this.length));
-  }
-  resize(){
-    const length = this.length;
-    this.size = this.size * 2;
-    const buf = Buffer.allocUnsafe(this.size);
-    this.buf.copy(buf,0, 0, length);
-    this.buf = buf;
-  }
-  toString(encoding){
-    if(encoding){
-      return this.buf.slice(0, this.length).toString(encoding);
-    }else {
-      return Uint8Array.prototype.slice.call(this.buf.slice(0, this.length));
-    }
-  }
-  toJSON(){
-    return this.toString('utf8');
-  }
-  reset(){
-    this.length = 0;
-  }
-}
-
-class CsvError extends Error {
-  constructor(code, message, options, ...contexts) {
-    if(Array.isArray(message)) message = message.join(' ');
-    super(message);
-    if(Error.captureStackTrace !== undefined){
-      Error.captureStackTrace(this, CsvError);
-    }
-    this.code = code;
-    for(const context of contexts){
-      for(const key in context){
-        const value = context[key];
-        this[key] = Buffer.isBuffer(value) ? value.toString(options.encoding) : value == null ? value : JSON.parse(JSON.stringify(value));
-      }
-    }
-  }
-}
+import ResizeableBuffer from './ResizeableBuffer.js';
+import CsvError from './CsvError.js';
 
 const underscore = function(str){
   return str.replace(/([A-Z])/g, function(_, match){
@@ -90,6 +11,8 @@ const underscore = function(str){
 const isObject = function(obj){
   return (typeof obj === 'object' && obj !== null && !Array.isArray(obj));
 };
+
+export {isObject};
 
 const isRecordEmpty = function(record){
   return record.every((field) => field == null || field.toString && field.toString().trim() === '');
@@ -112,7 +35,7 @@ const normalizeColumnsArray = function(columns){
         ]);
       }
       normalizedColumns[i] = column;
-    }else {
+    }else{
       throw new CsvError('CSV_INVALID_COLUMN_DEFINITION', [
         'Invalid column definition:',
         'expect a string or a literal object,',
@@ -194,7 +117,7 @@ const init = function(opts){
       const date = Date.parse(value);
       return !isNaN(date) ? new Date(date) : value;
     };
-  }else {
+  }else{
     throw new CsvError('CSV_INVALID_OPTION_CAST_DATE', [
       'Invalid option cast_date:', 'cast_date must be true or a function,',
       `got ${JSON.stringify(options.cast_date)}`
@@ -212,7 +135,7 @@ const init = function(opts){
     options.columns = normalizeColumnsArray(options.columns);
   }else if(options.columns === undefined || options.columns === null || options.columns === false){
     options.columns = false;
-  }else {
+  }else{
     throw new CsvError('CSV_INVALID_OPTION_COLUMNS', [
       'Invalid option columns:',
       'expect an array, a function or true,',
@@ -237,7 +160,7 @@ const init = function(opts){
   // Normalize option `comment`
   if(options.comment === undefined || options.comment === null || options.comment === false || options.comment === ''){
     options.comment = null;
-  }else {
+  }else{
     if(typeof options.comment === 'string'){
       options.comment = Buffer.from(options.comment, options.encoding);
     }
@@ -291,7 +214,7 @@ const init = function(opts){
   // Normalize option `from`
   if(options.from === undefined || options.from === null){
     options.from = 1;
-  }else {
+  }else{
     if(typeof options.from === 'string' && /\d+/.test(options.from)){
       options.from = parseInt(options.from);
     }
@@ -299,14 +222,14 @@ const init = function(opts){
       if(options.from < 0){
         throw new Error(`Invalid Option: from must be a positive integer, got ${JSON.stringify(opts.from)}`);
       }
-    }else {
+    }else{
       throw new Error(`Invalid Option: from must be an integer, got ${JSON.stringify(options.from)}`);
     }
   }
   // Normalize option `from_line`
   if(options.from_line === undefined || options.from_line === null){
     options.from_line = 1;
-  }else {
+  }else{
     if(typeof options.from_line === 'string' && /\d+/.test(options.from_line)){
       options.from_line = parseInt(options.from_line);
     }
@@ -314,7 +237,7 @@ const init = function(opts){
       if(options.from_line <= 0){
         throw new Error(`Invalid Option: from_line must be a positive integer greater than 0, got ${JSON.stringify(opts.from_line)}`);
       }
-    }else {
+    }else{
       throw new Error(`Invalid Option: from_line must be an integer, got ${JSON.stringify(opts.from_line)}`);
     }
   }
@@ -348,9 +271,11 @@ const init = function(opts){
   // Normalize option `max_record_size`
   if(options.max_record_size === undefined || options.max_record_size === null || options.max_record_size === false){
     options.max_record_size = 0;
-  }else if(Number.isInteger(options.max_record_size) && options.max_record_size >= 0);else if(typeof options.max_record_size === 'string' && /\d+/.test(options.max_record_size)){
+  }else if(Number.isInteger(options.max_record_size) && options.max_record_size >= 0){
+    // Great, nothing to do
+  }else if(typeof options.max_record_size === 'string' && /\d+/.test(options.max_record_size)){
     options.max_record_size = parseInt(options.max_record_size);
-  }else {
+  }else{
     throw new Error(`Invalid Option: max_record_size must be a positive integer, got ${JSON.stringify(options.max_record_size)}`);
   }
   // Normalize option `objname`
@@ -360,7 +285,9 @@ const init = function(opts){
     if(options.objname.length === 0){
       throw new Error(`Invalid Option: objname must be a non empty buffer`);
     }
-    if(options.encoding === null);else {
+    if(options.encoding === null){
+      // Don't call `toString`, leave objname as a buffer
+    }else{
       options.objname = options.objname.toString(options.encoding);
     }
   }else if(typeof options.objname === 'string'){
@@ -368,7 +295,12 @@ const init = function(opts){
       throw new Error(`Invalid Option: objname must be a non empty string`);
     }
     // Great, nothing to do
-  }else if(typeof options.objname === 'number');else {
+  }else if(typeof options.objname === 'number'){
+    // if(options.objname.length === 0){
+    //   throw new Error(`Invalid Option: objname must be a non empty string`);
+    // }
+    // Great, nothing to do
+  }else{
     throw new Error(`Invalid Option: objname must be a string or a buffer, got ${options.objname}`);
   }
   if(options.objname !== undefined){
@@ -376,7 +308,7 @@ const init = function(opts){
       if(options.columns !== false){
         throw Error('Invalid Option: objname index cannot be combined with columns or be defined as a field');
       }
-    }else { // A string or a buffer
+    }else{ // A string or a buffer
       if(options.columns === false){
         throw Error('Invalid Option: objname field must be combined with columns or be defined as an index');
       }
@@ -395,7 +327,7 @@ const init = function(opts){
   // Normalize option `quote`
   if(options.quote === null || options.quote === false || options.quote === ''){
     options.quote = null;
-  }else {
+  }else{
     if(options.quote === undefined || options.quote === true){
       options.quote = Buffer.from('"', options.encoding);
     }else if(typeof options.quote === 'string'){
@@ -452,43 +384,57 @@ const init = function(opts){
     return rd;
   });
   // Normalize option `relax_column_count`
-  if(typeof options.relax_column_count === 'boolean');else if(options.relax_column_count === undefined || options.relax_column_count === null){
+  if(typeof options.relax_column_count === 'boolean'){
+    // Great, nothing to do
+  }else if(options.relax_column_count === undefined || options.relax_column_count === null){
     options.relax_column_count = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: relax_column_count must be a boolean, got ${JSON.stringify(options.relax_column_count)}`);
   }
-  if(typeof options.relax_column_count_less === 'boolean');else if(options.relax_column_count_less === undefined || options.relax_column_count_less === null){
+  if(typeof options.relax_column_count_less === 'boolean'){
+    // Great, nothing to do
+  }else if(options.relax_column_count_less === undefined || options.relax_column_count_less === null){
     options.relax_column_count_less = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: relax_column_count_less must be a boolean, got ${JSON.stringify(options.relax_column_count_less)}`);
   }
-  if(typeof options.relax_column_count_more === 'boolean');else if(options.relax_column_count_more === undefined || options.relax_column_count_more === null){
+  if(typeof options.relax_column_count_more === 'boolean'){
+    // Great, nothing to do
+  }else if(options.relax_column_count_more === undefined || options.relax_column_count_more === null){
     options.relax_column_count_more = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: relax_column_count_more must be a boolean, got ${JSON.stringify(options.relax_column_count_more)}`);
   }
   // Normalize option `relax_quotes`
-  if(typeof options.relax_quotes === 'boolean');else if(options.relax_quotes === undefined || options.relax_quotes === null){
+  if(typeof options.relax_quotes === 'boolean'){
+    // Great, nothing to do
+  }else if(options.relax_quotes === undefined || options.relax_quotes === null){
     options.relax_quotes = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: relax_quotes must be a boolean, got ${JSON.stringify(options.relax_quotes)}`);
   }
   // Normalize option `skip_empty_lines`
-  if(typeof options.skip_empty_lines === 'boolean');else if(options.skip_empty_lines === undefined || options.skip_empty_lines === null){
+  if(typeof options.skip_empty_lines === 'boolean'){
+    // Great, nothing to do
+  }else if(options.skip_empty_lines === undefined || options.skip_empty_lines === null){
     options.skip_empty_lines = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: skip_empty_lines must be a boolean, got ${JSON.stringify(options.skip_empty_lines)}`);
   }
   // Normalize option `skip_records_with_empty_values`
-  if(typeof options.skip_records_with_empty_values === 'boolean');else if(options.skip_records_with_empty_values === undefined || options.skip_records_with_empty_values === null){
+  if(typeof options.skip_records_with_empty_values === 'boolean'){
+    // Great, nothing to do
+  }else if(options.skip_records_with_empty_values === undefined || options.skip_records_with_empty_values === null){
     options.skip_records_with_empty_values = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: skip_records_with_empty_values must be a boolean, got ${JSON.stringify(options.skip_records_with_empty_values)}`);
   }
   // Normalize option `skip_records_with_error`
-  if(typeof options.skip_records_with_error === 'boolean');else if(options.skip_records_with_error === undefined || options.skip_records_with_error === null){
+  if(typeof options.skip_records_with_error === 'boolean'){
+    // Great, nothing to do
+  }else if(options.skip_records_with_error === undefined || options.skip_records_with_error === null){
     options.skip_records_with_error = false;
-  }else {
+  }else{
     throw new Error(`Invalid Option: skip_records_with_error must be a boolean, got ${JSON.stringify(options.skip_records_with_error)}`);
   }
   // Normalize option `rtrim`
@@ -523,7 +469,7 @@ const init = function(opts){
   // Normalize option `to`
   if(options.to === undefined || options.to === null){
     options.to = -1;
-  }else {
+  }else{
     if(typeof options.to === 'string' && /\d+/.test(options.to)){
       options.to = parseInt(options.to);
     }
@@ -531,14 +477,14 @@ const init = function(opts){
       if(options.to <= 0){
         throw new Error(`Invalid Option: to must be a positive integer greater than 0, got ${JSON.stringify(opts.to)}`);
       }
-    }else {
+    }else{
       throw new Error(`Invalid Option: to must be an integer, got ${JSON.stringify(opts.to)}`);
     }
   }
   // Normalize option `to_line`
   if(options.to_line === undefined || options.to_line === null){
     options.to_line = -1;
-  }else {
+  }else{
     if(typeof options.to_line === 'string' && /\d+/.test(options.to_line)){
       options.to_line = parseInt(options.to_line);
     }
@@ -546,7 +492,7 @@ const init = function(opts){
       if(options.to_line <= 0){
         throw new Error(`Invalid Option: to_line must be a positive integer greater than 0, got ${JSON.stringify(opts.to_line)}`);
       }
-    }else {
+    }else{
       throw new Error(`Invalid Option: to_line must be an integer, got ${JSON.stringify(opts.to_line)}`);
     }
   }
@@ -597,7 +543,7 @@ const init = function(opts){
   };
 };
 
-function api(push, opts) {
+export default function(push, opts) {
   const {info, options, state} = init(opts);
   return {
     push: push,
@@ -631,12 +577,12 @@ function api(push, opts) {
           // Handle empty string
           this.push(null);
           return;
-        }else {
+        }else{
           buf = nextBuf;
         }
       }else if(previousBuf !== undefined && nextBuf === undefined){
         buf = previousBuf;
-      }else {
+      }else{
         buf = Buffer.concat([previousBuf, nextBuf]);
       }
       // Handle UTF BOM
@@ -650,7 +596,7 @@ function api(push, opts) {
             this.state.previousBuf = buf;
             return;
           }
-        }else {
+        }else{
           for(const encoding in boms){
             if(boms[encoding].compare(buf, 0, boms[encoding].length) === 0){
               // Skip BOM
@@ -702,7 +648,7 @@ function api(push, opts) {
         // treat the current char as a regular char
         if(this.state.escaping === true){
           this.state.escaping = false;
-        }else {
+        }else{
           // Escape is only active inside quoted fields
           // We are quoting, the char is an escape chr and there is a chr to escape
           // if(escape !== null && this.state.quoting === true && chr === escape && pos + 1 < bufLen){
@@ -713,7 +659,7 @@ function api(push, opts) {
                 pos += escape.length - 1;
                 continue;
               }
-            }else {
+            }else{
               this.state.escaping = true;
               pos += escape.length - 1;
               continue;
@@ -748,13 +694,13 @@ function api(push, opts) {
                   ], this.options, this.__infoField())
                 );
                 if(err !== undefined) return err;
-              }else {
+              }else{
                 this.state.quoting = false;
                 this.state.wasQuoting = true;
                 this.state.field.prepend(quote);
                 pos += quote.length - 1;
               }
-            }else {
+            }else{
               if(this.state.field.length !== 0){
                 // In relax_quotes mode, treat opening quote preceded by chrs as regular
                 if(relax_quotes === false){
@@ -768,7 +714,7 @@ function api(push, opts) {
                   );
                   if(err !== undefined) return err;
                 }
-              }else {
+              }else{
                 this.state.quoting = true;
                 pos += quote.length - 1;
                 continue;
@@ -783,7 +729,7 @@ function api(push, opts) {
               if(skipCommentLine){
                 this.info.comment_lines++;
                 // Skip full comment line
-              }else {
+              }else{
                 // Activate records emition if above from_line
                 if(this.state.enabled === false && this.info.lines + (this.state.wasRowDelimiter === true ? 1: 0) >= from_line){
                   this.state.enabled = true;
@@ -871,7 +817,7 @@ function api(push, opts) {
             ], this.options, this.__infoField())
           );
           if(err !== undefined) return err;
-        }else {
+        }else{
           // Skip last line if it has no characters
           if(this.state.wasQuoting === true || this.state.record.length !== 0 || this.state.field.length !== 0){
             this.info.bytes = this.state.bufBytesStart + pos;
@@ -885,7 +831,7 @@ function api(push, opts) {
             this.info.comment_lines++;
           }
         }
-      }else {
+      }else{
         this.state.bufBytesStart += pos;
         this.state.previousBuf = buf.slice(pos);
       }
@@ -935,7 +881,7 @@ function api(push, opts) {
           this.info.invalid_field_length++;
           this.state.error = err;
         // Error is undefined with skip_records_with_error
-        }else {
+        }else{
           const finalErr = this.__error(err);
           if(finalErr) return finalErr;
         }
@@ -982,7 +928,7 @@ function api(push, opts) {
             if(err){
               return err;
             }
-          }else {
+          }else{
             const err = this.__push(
               objname === undefined ? obj : [obj[objname], obj]
             );
@@ -991,7 +937,7 @@ function api(push, opts) {
             }
           }
         // Without columns, records are array
-        }else {
+        }else{
           if(raw === true || info === true){
             const extRecord = Object.assign(
               {record: record},
@@ -1004,7 +950,7 @@ function api(push, opts) {
             if(err){
               return err;
             }
-          }else {
+          }else{
             const err = this.__push(
               objname === undefined ? record : [record[objname], record]
             );
@@ -1204,7 +1150,7 @@ function api(push, opts) {
           this.options.record_delimiter.push(Buffer.from('\r\n', encoding));
           this.state.recordDelimiterMaxLength = 2;
           return 2;
-        }else {
+        }else{
           this.options.record_delimiter.push(Buffer.from('\r', encoding));
           this.state.recordDelimiterMaxLength = 1;
           return 1;
@@ -1223,7 +1169,7 @@ function api(push, opts) {
         this.state.recordHasError = true;
         this.emit('skip', err, raw ? this.state.rawBuffer.toString(encoding) : undefined);
         return undefined;
-      }else {
+      }else{
         return err;
       }
     },
@@ -1259,45 +1205,3 @@ function api(push, opts) {
     }
   };
 }
-
-const parse = function(data, options={}){
-  if(typeof data === 'string'){
-    data = Buffer.from(data);
-  }
-  const records = options && options.objname ? {} : [];
-  
-  const push = (record) => {
-    // this.push.call(this, record);
-    if(record === null) return;
-    if(options.objname === undefined)
-      records.push(record);
-    else {
-      records[record[0]] = record[1];
-    }
-  };
-  const parser = api(push, options);
-  const err1 = parser.__parse(data, false);
-  if(err1 !== undefined) throw err1;
-  const err2 = parser.__parse(undefined, true);
-  if(err2 !== undefined) throw err2;
-  return records;
-  // const parser = new Parser(options);
-  // parser.push = function(record){
-  //   if(record === null){
-  //     return;
-  //   }
-  //   if(options.objname === undefined)
-  //     records.push(record);
-  //   else{
-  //     records[record[0]] = record[1];
-  //   }
-  // };
-  // const err1 = parser.__parse(data, false);
-  // if(err1 !== undefined) throw err1;
-  // const err2 = parser.__parse(undefined, true);
-  // if(err2 !== undefined) throw err2;
-  // return records;
-};
-
-exports.CsvError = CsvError;
-exports.parse = parse;
