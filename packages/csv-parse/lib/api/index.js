@@ -1,5 +1,6 @@
 
 import {normalize_columns_array} from './normalize_columns_array.js';
+import {init_state} from './init_state.js';
 import {normalize_options} from './normalize_options.js';
 import {CsvError} from './CsvError.js';
 import {isObject} from './isObject.js';
@@ -97,8 +98,7 @@ const transform = function(original_options, options, state, push) {
               this.state.bufBytesStart += bomLength;
               buf = buf.slice(bomLength);
               // Renormalize original options with the new encoding
-              const {options} = normalize_options({...this.original_options, encoding: encoding});
-              this.options = options;
+              this.options = normalize_options({...this.original_options, encoding: encoding});
               break;
             }
           }
@@ -699,4 +699,4 @@ const transform = function(original_options, options, state, push) {
 };
 
 
-export {isObject, normalize_options, transform, CsvError};
+export {init_state, isObject, normalize_options, transform, CsvError};

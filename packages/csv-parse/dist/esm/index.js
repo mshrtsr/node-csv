@@ -5077,6 +5077,43 @@ class ResizeableBuffer{
   }
 }
 
+const init_state = function(options){
+  return {
+    bomSkipped: false,
+    bufBytesStart: 0,
+    castField: options.cast_function,
+    commenting: false,
+    // Current error encountered by a record
+    error: undefined,
+    enabled: options.from_line === 1,
+    escaping: false,
+    escapeIsQuote: isBuffer(options.escape) && isBuffer(options.quote) && Buffer.compare(options.escape, options.quote) === 0,
+    // columns can be `false`, `true`, `Array`
+    expectedRecordLength: Array.isArray(options.columns) ? options.columns.length : undefined,
+    field: new ResizeableBuffer(20),
+    firstLineToHeaders: options.cast_first_line_to_header,
+    needMoreDataSize: Math.max(
+      // Skip if the remaining buffer smaller than comment
+      options.comment !== null ? options.comment.length : 0,
+      // Skip if the remaining buffer can be delimiter
+      ...options.delimiter.map((delimiter) => delimiter.length),
+      // Skip if the remaining buffer can be escape sequence
+      options.quote !== null ? options.quote.length : 0,
+    ),
+    previousBuf: undefined,
+    quoting: false,
+    stop: false,
+    rawBuffer: new ResizeableBuffer(100),
+    record: [],
+    recordHasError: false,
+    record_length: 0,
+    recordDelimiterMaxLength: options.record_delimiter.length === 0 ? 2 : Math.max(...options.record_delimiter.map((v) => v.length)),
+    trimChars: [Buffer.from(' ', options.encoding)[0], Buffer.from('\t', options.encoding)[0]],
+    wasQuoting: false,
+    wasRowDelimiter: false
+  };
+};
+
 const underscore = function(str){
   return str.replace(/([A-Z])/g, function(_, match){
     return '_' + match.toLowerCase();
@@ -5113,11 +5150,11 @@ const normalize_options = function(opts){
     ], options);
   }
   // Normalize option `cast`
-  let fnCastField = null;
+  options.cast_function = null;
   if(options.cast === undefined || options.cast === null || options.cast === false || options.cast === ''){
     options.cast = undefined;
   }else if(typeof options.cast === 'function'){
-    fnCastField = options.cast;
+    options.cast_function = options.cast;
     options.cast = true;
   }else if(options.cast !== true){
     throw new CsvError('CSV_INVALID_OPTION_CAST', [
@@ -5140,12 +5177,12 @@ const normalize_options = function(opts){
     ], options);
   }
   // Normalize option `columns`
-  let fnFirstLineToHeaders = null;
+  options.cast_first_line_to_header = null;
   if(options.columns === true){
     // Fields in the first line are converted as-is to columns
-    fnFirstLineToHeaders = undefined;
+    options.cast_first_line_to_header = undefined;
   }else if(typeof options.columns === 'function'){
-    fnFirstLineToHeaders = options.columns;
+    options.cast_first_line_to_header = options.columns;
     options.columns = true;
   }else if(Array.isArray(options.columns)){
     options.columns = normalize_columns_array(options.columns);
@@ -5489,43 +5526,7 @@ const normalize_options = function(opts){
       throw new Error(`Invalid Option: to_line must be an integer, got ${JSON.stringify(opts.to_line)}`);
     }
   }
-  return {
-    options: options,
-    state: {
-      bomSkipped: false,
-      bufBytesStart: 0,
-      castField: fnCastField,
-      commenting: false,
-      // Current error encountered by a record
-      error: undefined,
-      enabled: options.from_line === 1,
-      escaping: false,
-      escapeIsQuote: isBuffer(options.escape) && isBuffer(options.quote) && Buffer.compare(options.escape, options.quote) === 0,
-      // columns can be `false`, `true`, `Array`
-      expectedRecordLength: Array.isArray(options.columns) ? options.columns.length : undefined,
-      field: new ResizeableBuffer(20),
-      firstLineToHeaders: fnFirstLineToHeaders,
-      needMoreDataSize: Math.max(
-        // Skip if the remaining buffer smaller than comment
-        options.comment !== null ? options.comment.length : 0,
-        // Skip if the remaining buffer can be delimiter
-        ...options.delimiter.map((delimiter) => delimiter.length),
-        // Skip if the remaining buffer can be escape sequence
-        options.quote !== null ? options.quote.length : 0,
-      ),
-      previousBuf: undefined,
-      quoting: false,
-      stop: false,
-      rawBuffer: new ResizeableBuffer(100),
-      record: [],
-      recordHasError: false,
-      record_length: 0,
-      recordDelimiterMaxLength: options.record_delimiter.length === 0 ? 2 : Math.max(...options.record_delimiter.map((v) => v.length)),
-      trimChars: [Buffer.from(' ', options.encoding)[0], Buffer.from('\t', options.encoding)[0]],
-      wasQuoting: false,
-      wasRowDelimiter: false
-    }
-  };
+  return options;
 };
 
 const isRecordEmpty = function(record){
@@ -5621,8 +5622,7 @@ const transform = function(original_options, options, state, push) {
               this.state.bufBytesStart += bomLength;
               buf = buf.slice(bomLength);
               // Renormalize original options with the new encoding
-              const {options} = normalize_options({...this.original_options, encoding: encoding});
-              this.options = options;
+              this.options = normalize_options({...this.original_options, encoding: encoding});
               break;
             }
           }
@@ -6225,15 +6225,13 @@ const transform = function(original_options, options, state, push) {
 class Parser extends Transform {
   constructor(opts = {}){
     super({...{readableObjectMode: true}, ...opts, encoding: null});
-    const {options, state} = normalize_options(opts);
-    this.options = options;
-    this.state = state;
+    this.options = normalize_options(opts);
+    this.state = init_state(this.options);
     const push = (record) => {
       this.push.call(this, record);
     };
     this.api = transform(opts, this.options, this.state, push);
     this.info = this.api.info;
-    this.options = this.api.options;
   }
   // Implementation of `Transform._transform`
   _transform(buf, encoding, callback){
