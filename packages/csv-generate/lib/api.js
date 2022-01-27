@@ -1,14 +1,3 @@
-'use strict';
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-var stream = require('stream');
-var util = require('util');
-
-function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
-
-var stream__default = /*#__PURE__*/_interopDefaultLegacy(stream);
-var util__default = /*#__PURE__*/_interopDefaultLegacy(util);
 
 const camelize = function(str){
   return str.replace(/_([a-z])/gi, function(_, match){
@@ -20,7 +9,7 @@ const camelize = function(str){
 const random = function(options={}){
   if(options.seed){
     return options.seed = options.seed * Math.PI * 100 % 100 / 100;
-  }else {
+  }else{
     return Math.random();
   }
 };
@@ -117,11 +106,11 @@ const read = (options, state, size, push, close) => {
           for(const record of data){
             push(record);
           }
-        }else {
+        }else{
           push(data.join('') + (options.eof ? options.eof : ''));
         }
         state.end = true;
-      }else {
+      }else{
         close();
       }
       return;
@@ -139,7 +128,7 @@ const read = (options, state, size, push, close) => {
       // This is wrong and shall equal to 1 record only
       for(const column of record)
         recordLength += column.length;
-    }else {
+    }else{
       // Stringify the record
       record = (state.count_created === 0 ? '' : options.rowDelimiter)+record.join(options.delimiter);
       recordLength = record.length;
@@ -151,11 +140,11 @@ const read = (options, state, size, push, close) => {
         for(const record of data){
           push(record);
         }
-      }else {
+      }else{
         if(options.fixedSize){
           state.fixed_size_buffer = record.substr(size - length);
           data.push(record.substr(0, size - length));
-        }else {
+        }else{
           data.push(record);
         }
         push(data.join(''));
@@ -177,77 +166,4 @@ const init_state = (options) => {
   };
 };
 
-const Generator = function(options = {}){
-  this.options = normalize_options(options);
-  // Call parent constructor
-  stream__default["default"].Readable.call(this, this.options);
-  this._ = init_state(this.options);
-  return this;
-};
-util__default["default"].inherits(Generator, stream__default["default"].Readable);
-
-
-// Stop the generation.
-Generator.prototype.end = function(){
-  this.push(null);
-};
-// Put new data into the read queue.
-Generator.prototype._read = function(size){
-  const self = this;
-  read(this.options, this._, size, function() {
-    self.__push.apply(self, arguments);
-  }, function(){
-    self.push(null);
-  });
-};
-// Put new data into the read queue.
-Generator.prototype.__push = function(record){
-  // console.log('push', record)
-  const push = () => {
-    this._.count_written++;
-    this.push(record);
-    if(this._.end === true){
-      return this.push(null);
-    }
-  };
-  this.options.sleep > 0 ? setTimeout(push, this.options.sleep) : push();
-};
-
-const generate = function(options){
-  if(typeof options === 'string' && /\d+/.test(options)){
-    options = parseInt(options);
-  }
-  if(Number.isInteger(options)){
-    options = {length: options};
-  }else if(typeof options !== 'object' || options === null){
-    throw Error('Invalid Argument: options must be an object or an integer');
-  }
-  if(!Number.isInteger(options.length)){
-    throw Error('Invalid Argument: length is not defined');
-  }
-  const chunks = [];
-  let work = true;
-  // See https://nodejs.org/api/stream.html#stream_new_stream_readable_options
-  options.highWaterMark = options.objectMode ? 16 : 16384;
-  const generator = new Generator(options);
-  generator.push = function(chunk){
-    if(chunk === null){
-      return work = false; 
-    }
-    if(options.objectMode){
-      chunks.push(chunk);
-    }else {
-      chunks.push(chunk);  
-    }
-  };
-  while(work){
-    generator._read(options.highWaterMark);
-  }
-  if(!options.objectMode){
-    return chunks.join('');
-  }else {
-    return chunks;
-  }
-};
-
-exports.generate = generate;
+export {normalize_options, init_state, random, read};
