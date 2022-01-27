@@ -10,10 +10,14 @@ function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'defau
 var stream__default = /*#__PURE__*/_interopDefaultLegacy(stream);
 var util__default = /*#__PURE__*/_interopDefaultLegacy(util);
 
-const camelize = function(str){
-  return str.replace(/_([a-z])/gi, function(_, match){
-    return match.toUpperCase();
-  });
+const init_state = (options) => {
+  // State
+  return {
+    start_time: options.duration ? Date.now() : null,
+    fixed_size_buffer: '',
+    count_written: 0,
+    count_created: 0,
+  };
 };
 
 // Generate a random number between 0 and 1 with 2 decimals. The function is idempotent if it detect the "seed" option.
@@ -44,6 +48,12 @@ const types = {
   bool: function(options){
     return Math.floor(random(options) * 2);
   }
+};
+
+const camelize = function(str){
+  return str.replace(/_([a-z])/gi, function(_, match){
+    return match.toUpperCase();
+  });
 };
 
 const normalize_options = (opts) => {
@@ -100,7 +110,6 @@ const normalize_options = (opts) => {
 };
 
 const read = (options, state, size, push, close) => {
-  
   // Already started
   const data = [];
   let length = state.fixed_size_buffer.length;
@@ -167,16 +176,6 @@ const read = (options, state, size, push, close) => {
   }
 };
 
-const init_state = (options) => {
-  // State
-  return {
-    start_time: options.duration ? Date.now() : null,
-    fixed_size_buffer: '',
-    count_written: 0,
-    count_created: 0,
-  };
-};
-
 const Generator = function(options = {}){
   this.options = normalize_options(options);
   // Call parent constructor
@@ -185,7 +184,6 @@ const Generator = function(options = {}){
   return this;
 };
 util__default["default"].inherits(Generator, stream__default["default"].Readable);
-
 
 // Stop the generation.
 Generator.prototype.end = function(){

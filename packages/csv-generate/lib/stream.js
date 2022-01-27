@@ -2,7 +2,7 @@
 import {
   ReadableStream,
 } from 'node:stream/web';
-import {normalize_options, init_state, read} from './api.js';
+import {normalize_options, init_state, read} from './api/index.js';
 
 const generate = (opts) => {
   const options = normalize_options(opts || {});

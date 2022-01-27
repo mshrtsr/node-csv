@@ -8,7 +8,7 @@ additional information.
 
 import stream from 'stream';
 import util from 'util';
-import {normalize_options, init_state, read} from './api.js';
+import {normalize_options, init_state, read} from './api/index.js';
 
 const Generator = function(options = {}){
   this.options = normalize_options(options);
@@ -18,7 +18,6 @@ const Generator = function(options = {}){
   return this;
 };
 util.inherits(Generator, stream.Readable);
-
 
 // Stop the generation.
 Generator.prototype.end = function(){
