@@ -7,8 +7,8 @@ additional information.
 */
 
 import { Transform } from 'stream';
-import api, {isObject} from './api.js';
-import CsvError from './CsvError.js';
+import {isObject, transform} from './api/index.js';
+import {CsvError} from './api/CsvError.js';
 
 class Parser extends Transform {
   constructor(opts = {}){
@@ -17,7 +17,7 @@ class Parser extends Transform {
     const push = (record) => {
       this.push.call(this, record);
     };
-    this.api = api(push, opts);
+    this.api = transform(push, opts);
     this.info = this.api.info;
     this.options = this.api.options;
     this.state = this.api.state;

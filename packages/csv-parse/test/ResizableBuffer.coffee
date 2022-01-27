@@ -1,5 +1,5 @@
 
-import ResizeableBuffer from '../lib/ResizeableBuffer.js'
+import ResizeableBuffer from '../lib/api/ResizeableBuffer.js'
 
 describe 'ResizeableBuffer', ->
   

@@ -16,4 +16,4 @@ class CsvError extends Error {
   }
 }
 
-export default CsvError;
+export {CsvError};

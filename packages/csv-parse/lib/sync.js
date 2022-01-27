@@ -1,6 +1,5 @@
 
-import api from './api.js';
-import CsvError from './CsvError.js';
+import {CsvError, transform} from './api/index.js';
 
 const parse = function(data, options={}){
   if(typeof data === 'string'){
@@ -17,7 +16,7 @@ const parse = function(data, options={}){
       records[record[0]] = record[1];
     }
   };
-  const parser = api(push, options);
+  const parser = transform(push, options);
   const err1 = parser.__parse(data, false);
   if(err1 !== undefined) throw err1;
   const err2 = parser.__parse(undefined, true);

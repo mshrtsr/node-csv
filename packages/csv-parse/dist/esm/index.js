@@ -6,7 +6,7 @@ var lookup = [];
 var revLookup = [];
 var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array;
 var inited = false;
-function init$1 () {
+function init () {
   inited = true;
   var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   for (var i = 0, len = code.length; i < len; ++i) {
@@ -20,7 +20,7 @@ function init$1 () {
 
 function toByteArray (b64) {
   if (!inited) {
-    init$1();
+    init();
   }
   var i, j, l, tmp, placeHolders, arr;
   var len = b64.length;
@@ -79,7 +79,7 @@ function encodeChunk (uint8, start, end) {
 
 function fromByteArray (uint8) {
   if (!inited) {
-    init$1();
+    init();
   }
   var tmp;
   var len = uint8.length;
@@ -4966,6 +4966,55 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
+class CsvError extends Error {
+  constructor(code, message, options, ...contexts) {
+    if(Array.isArray(message)) message = message.join(' ');
+    super(message);
+    if(Error.captureStackTrace !== undefined){
+      Error.captureStackTrace(this, CsvError);
+    }
+    this.code = code;
+    for(const context of contexts){
+      for(const key in context){
+        const value = context[key];
+        this[key] = isBuffer(value) ? value.toString(options.encoding) : value == null ? value : JSON.parse(JSON.stringify(value));
+      }
+    }
+  }
+}
+
+const isObject = function(obj){
+  return (typeof obj === 'object' && obj !== null && !Array.isArray(obj));
+};
+
+const normalize_columns_array = function(columns){
+  const normalizedColumns = [];
+  for(let i = 0, l = columns.length; i < l; i++){
+    const column = columns[i];
+    if(column === undefined || column === null || column === false){
+      normalizedColumns[i] = { disabled: true };
+    }else if(typeof column === 'string'){
+      normalizedColumns[i] = { name: column };
+    }else if(isObject(column)){
+      if(typeof column.name !== 'string'){
+        throw new CsvError('CSV_OPTION_COLUMNS_MISSING_NAME', [
+          'Option columns missing name:',
+          `property "name" is required at position ${i}`,
+          'when column is an object literal'
+        ]);
+      }
+      normalizedColumns[i] = column;
+    }else {
+      throw new CsvError('CSV_INVALID_COLUMN_DEFINITION', [
+        'Invalid column definition:',
+        'expect a string or a literal object,',
+        `got ${JSON.stringify(column)} at position ${i}`
+      ]);
+    }
+  }
+  return normalizedColumns;
+};
+
 class ResizeableBuffer{
   constructor(size=100){
     this.size = size;
@@ -5028,87 +5077,13 @@ class ResizeableBuffer{
   }
 }
 
-class CsvError extends Error {
-  constructor(code, message, options, ...contexts) {
-    if(Array.isArray(message)) message = message.join(' ');
-    super(message);
-    if(Error.captureStackTrace !== undefined){
-      Error.captureStackTrace(this, CsvError);
-    }
-    this.code = code;
-    for(const context of contexts){
-      for(const key in context){
-        const value = context[key];
-        this[key] = isBuffer(value) ? value.toString(options.encoding) : value == null ? value : JSON.parse(JSON.stringify(value));
-      }
-    }
-  }
-}
-
 const underscore = function(str){
   return str.replace(/([A-Z])/g, function(_, match){
     return '_' + match.toLowerCase();
   });
 };
 
-const isObject = function(obj){
-  return (typeof obj === 'object' && obj !== null && !Array.isArray(obj));
-};
-
-const isRecordEmpty = function(record){
-  return record.every((field) => field == null || field.toString && field.toString().trim() === '');
-};
-
-const normalizeColumnsArray = function(columns){
-  const normalizedColumns = [];
-  for(let i = 0, l = columns.length; i < l; i++){
-    const column = columns[i];
-    if(column === undefined || column === null || column === false){
-      normalizedColumns[i] = { disabled: true };
-    }else if(typeof column === 'string'){
-      normalizedColumns[i] = { name: column };
-    }else if(isObject(column)){
-      if(typeof column.name !== 'string'){
-        throw new CsvError('CSV_OPTION_COLUMNS_MISSING_NAME', [
-          'Option columns missing name:',
-          `property "name" is required at position ${i}`,
-          'when column is an object literal'
-        ]);
-      }
-      normalizedColumns[i] = column;
-    }else {
-      throw new CsvError('CSV_INVALID_COLUMN_DEFINITION', [
-        'Invalid column definition:',
-        'expect a string or a literal object,',
-        `got ${JSON.stringify(column)} at position ${i}`
-      ]);
-    }
-  }
-  return normalizedColumns;
-};
-
-// white space characters
-// https://en.wikipedia.org/wiki/Whitespace_character
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#Types
-// \f\n\r\t\v\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff
-const tab = 9;
-const nl = 10; // \n, 0x0A in hexadecimal, 10 in decimal
-const np = 12;
-const cr = 13; // \r, 0x0D in hexadécimal, 13 in decimal
-const space = 32;
-const boms = {
-  // Note, the following are equals:
-  // Buffer.from("\ufeff")
-  // Buffer.from([239, 187, 191])
-  // Buffer.from('EFBBBF', 'hex')
-  'utf8': Buffer.from([239, 187, 191]),
-  // Note, the following are equals:
-  // Buffer.from "\ufeff", 'utf16le
-  // Buffer.from([255, 254])
-  'utf16le': Buffer.from([255, 254])
-};
-
-const init = function(opts){
+const normalize_options = function(opts){
   const options = {};
   // Merge with user options
   for(const opt in opts){
@@ -5173,7 +5148,7 @@ const init = function(opts){
     fnFirstLineToHeaders = options.columns;
     options.columns = true;
   }else if(Array.isArray(options.columns)){
-    options.columns = normalizeColumnsArray(options.columns);
+    options.columns = normalize_columns_array(options.columns);
   }else if(options.columns === undefined || options.columns === null || options.columns === false){
     options.columns = false;
   }else {
@@ -5561,8 +5536,33 @@ const init = function(opts){
   };
 };
 
-function api(push, opts) {
-  const {info, options, state} = init(opts);
+const isRecordEmpty = function(record){
+  return record.every((field) => field == null || field.toString && field.toString().trim() === '');
+};
+
+// white space characters
+// https://en.wikipedia.org/wiki/Whitespace_character
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions/Character_Classes#Types
+// \f\n\r\t\v\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff
+const tab = 9;
+const nl = 10; // \n, 0x0A in hexadecimal, 10 in decimal
+const np = 12;
+const cr = 13; // \r, 0x0D in hexadécimal, 13 in decimal
+const space = 32;
+const boms = {
+  // Note, the following are equals:
+  // Buffer.from("\ufeff")
+  // Buffer.from([239, 187, 191])
+  // Buffer.from('EFBBBF', 'hex')
+  'utf8': Buffer.from([239, 187, 191]),
+  // Note, the following are equals:
+  // Buffer.from "\ufeff", 'utf16le
+  // Buffer.from([255, 254])
+  'utf16le': Buffer.from([255, 254])
+};
+
+const transform = function(push, opts) {
+  const {info, options, state} = normalize_options(opts);
   return {
     push: push,
     info: info,
@@ -5622,7 +5622,7 @@ function api(push, opts) {
               this.state.bufBytesStart += bomLength;
               buf = buf.slice(bomLength);
               // Renormalize original options with the new encoding
-              const {options} = init({...this.original_options, encoding: encoding});
+              const {options} = normalize_options({...this.original_options, encoding: encoding});
               this.options = options;
               // this.__normalizeOptions({...this.__originalOptions, encoding: encoding});
               break;
@@ -5995,7 +5995,7 @@ function api(push, opts) {
             })
           );
         }
-        const normalizedHeaders = normalizeColumnsArray(headers);
+        const normalizedHeaders = normalize_columns_array(headers);
         this.state.expectedRecordLength = normalizedHeaders.length;
         this.options.columns = normalizedHeaders;
         this.__resetRecord();
@@ -6222,7 +6222,7 @@ function api(push, opts) {
       };
     }
   };
-}
+};
 
 class Parser extends Transform {
   constructor(opts = {}){
@@ -6231,7 +6231,7 @@ class Parser extends Transform {
     const push = (record) => {
       this.push.call(this, record);
     };
-    this.api = api(push, opts);
+    this.api = transform(push, opts);
     this.info = this.api.info;
     this.options = this.api.options;
     this.state = this.api.state;
