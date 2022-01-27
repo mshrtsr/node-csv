@@ -2487,14 +2487,6 @@ const normalize_options = function(opts){
     }
   }
   return {
-    info: {
-      bytes: 0,
-      comment_lines: 0,
-      empty_lines: 0,
-      invalid_field_length: 0,
-      lines: 1,
-      records: 0
-    },
     options: options,
     state: {
       bomSkipped: false,
@@ -2558,12 +2550,19 @@ const boms = {
   'utf16le': Buffer.from([255, 254])
 };
 
-const transform = function(push, opts) {
-  const {info, options, state} = normalize_options(opts);
+const transform = function(original_options, options, state, push) {
+  const info = {
+    bytes: 0,
+    comment_lines: 0,
+    empty_lines: 0,
+    invalid_field_length: 0,
+    lines: 1,
+    records: 0
+  };
   return {
     push: push,
     info: info,
-    original_options: opts,
+    original_options: original_options,
     options: options,
     state: state,
     __needMoreData: function(i, bufLen, end){
@@ -2621,7 +2620,6 @@ const transform = function(push, opts) {
               // Renormalize original options with the new encoding
               const {options} = normalize_options({...this.original_options, encoding: encoding});
               this.options = options;
-              // this.__normalizeOptions({...this.__originalOptions, encoding: encoding});
               break;
             }
           }
@@ -3221,14 +3219,13 @@ const transform = function(push, opts) {
   };
 };
 
-const parse = function(data, options={}){
+const parse = function(data, opts={}){
   if(typeof data === 'string'){
     data = Buffer.from(data);
   }
-  const records = options && options.objname ? {} : [];
-  
+  const records = opts && opts.objname ? {} : [];
+  const {options, state} = normalize_options(opts);
   const push = (record) => {
-    // this.push.call(this, record);
     if(record === null) return;
     if(options.objname === undefined)
       records.push(record);
@@ -3236,7 +3233,7 @@ const parse = function(data, options={}){
       records[record[0]] = record[1];
     }
   };
-  const parser = transform(push, options);
+  const parser = transform(opts, options, state, push);
   const err1 = parser.__parse(data, false);
   if(err1 !== undefined) throw err1;
   const err2 = parser.__parse(undefined, true);

@@ -1,14 +1,13 @@
 
-import {CsvError, transform} from './api/index.js';
+import {CsvError, normalize_options, transform} from './api/index.js';
 
-const parse = function(data, options={}){
+const parse = function(data, opts={}){
   if(typeof data === 'string'){
     data = Buffer.from(data);
   }
-  const records = options && options.objname ? {} : [];
-  
+  const records = opts && opts.objname ? {} : [];
+  const {options, state} = normalize_options(opts);
   const push = (record) => {
-    // this.push.call(this, record);
     if(record === null) return;
     if(options.objname === undefined)
       records.push(record);
@@ -16,7 +15,7 @@ const parse = function(data, options={}){
       records[record[0]] = record[1];
     }
   };
-  const parser = transform(push, options);
+  const parser = transform(opts, options, state, push);
   const err1 = parser.__parse(data, false);
   if(err1 !== undefined) throw err1;
   const err2 = parser.__parse(undefined, true);

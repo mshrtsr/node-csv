@@ -29,12 +29,19 @@ const boms = {
   'utf16le': Buffer.from([255, 254])
 };
 
-const transform = function(push, opts) {
-  const {info, options, state} = normalize_options(opts);
+const transform = function(original_options, options, state, push) {
+  const info = {
+    bytes: 0,
+    comment_lines: 0,
+    empty_lines: 0,
+    invalid_field_length: 0,
+    lines: 1,
+    records: 0
+  };
   return {
     push: push,
     info: info,
-    original_options: opts,
+    original_options: original_options,
     options: options,
     state: state,
     __needMoreData: function(i, bufLen, end){
@@ -92,7 +99,6 @@ const transform = function(push, opts) {
               // Renormalize original options with the new encoding
               const {options} = normalize_options({...this.original_options, encoding: encoding});
               this.options = options;
-              // this.__normalizeOptions({...this.__originalOptions, encoding: encoding});
               break;
             }
           }
@@ -693,4 +699,4 @@ const transform = function(push, opts) {
 };
 
 
-export {isObject, transform, CsvError};
+export {isObject, normalize_options, transform, CsvError};

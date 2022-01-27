@@ -7,20 +7,21 @@ additional information.
 */
 
 import { Transform } from 'stream';
-import {isObject, transform} from './api/index.js';
+import {isObject, transform, normalize_options} from './api/index.js';
 import {CsvError} from './api/CsvError.js';
 
 class Parser extends Transform {
   constructor(opts = {}){
     super({...{readableObjectMode: true}, ...opts, encoding: null});
-    this.__originalOptions = opts;
+    const {options, state} = normalize_options(opts);
+    this.options = options;
+    this.state = state;
     const push = (record) => {
       this.push.call(this, record);
     };
-    this.api = transform(push, opts);
+    this.api = transform(opts, this.options, this.state, push);
     this.info = this.api.info;
     this.options = this.api.options;
-    this.state = this.api.state;
   }
   // Implementation of `Transform._transform`
   _transform(buf, encoding, callback){

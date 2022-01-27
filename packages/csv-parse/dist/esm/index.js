@@ -5490,14 +5490,6 @@ const normalize_options = function(opts){
     }
   }
   return {
-    info: {
-      bytes: 0,
-      comment_lines: 0,
-      empty_lines: 0,
-      invalid_field_length: 0,
-      lines: 1,
-      records: 0
-    },
     options: options,
     state: {
       bomSkipped: false,
@@ -5561,12 +5553,19 @@ const boms = {
   'utf16le': Buffer.from([255, 254])
 };
 
-const transform = function(push, opts) {
-  const {info, options, state} = normalize_options(opts);
+const transform = function(original_options, options, state, push) {
+  const info = {
+    bytes: 0,
+    comment_lines: 0,
+    empty_lines: 0,
+    invalid_field_length: 0,
+    lines: 1,
+    records: 0
+  };
   return {
     push: push,
     info: info,
-    original_options: opts,
+    original_options: original_options,
     options: options,
     state: state,
     __needMoreData: function(i, bufLen, end){
@@ -5624,7 +5623,6 @@ const transform = function(push, opts) {
               // Renormalize original options with the new encoding
               const {options} = normalize_options({...this.original_options, encoding: encoding});
               this.options = options;
-              // this.__normalizeOptions({...this.__originalOptions, encoding: encoding});
               break;
             }
           }
@@ -6227,14 +6225,15 @@ const transform = function(push, opts) {
 class Parser extends Transform {
   constructor(opts = {}){
     super({...{readableObjectMode: true}, ...opts, encoding: null});
-    this.__originalOptions = opts;
+    const {options, state} = normalize_options(opts);
+    this.options = options;
+    this.state = state;
     const push = (record) => {
       this.push.call(this, record);
     };
-    this.api = transform(push, opts);
+    this.api = transform(opts, this.options, this.state, push);
     this.info = this.api.info;
     this.options = this.api.options;
-    this.state = this.api.state;
   }
   // Implementation of `Transform._transform`
   _transform(buf, encoding, callback){

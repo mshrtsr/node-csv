@@ -434,14 +434,6 @@ const normalize_options = function(opts){
     }
   }
   return {
-    info: {
-      bytes: 0,
-      comment_lines: 0,
-      empty_lines: 0,
-      invalid_field_length: 0,
-      lines: 1,
-      records: 0
-    },
     options: options,
     state: {
       bomSkipped: false,
