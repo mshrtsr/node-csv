@@ -5209,7 +5209,7 @@ var csv_generate = (function (exports) {
               this.options = normalize_options(options);
               // Call parent constructor
               Stream.Readable.call(this, this.options);
-              this._ = init_state(this.options);
+              this.state = init_state(this.options);
               return this;
             };
             util.inherits(Generator, Stream.Readable);
@@ -5221,7 +5221,7 @@ var csv_generate = (function (exports) {
             // Put new data into the read queue.
             Generator.prototype._read = function(size){
               const self = this;
-              read(this.options, this._, size, function() {
+              read(this.options, this.state, size, function() {
                 self.__push.apply(self, arguments);
               }, function(){
                 self.push(null);
@@ -5231,9 +5231,9 @@ var csv_generate = (function (exports) {
             Generator.prototype.__push = function(record){
               // console.log('push', record)
               const push = () => {
-                this._.count_written++;
+                this.state.count_written++;
                 this.push(record);
-                if(this._.end === true){
+                if(this.state.end === true){
                   return this.push(null);
                 }
               };
