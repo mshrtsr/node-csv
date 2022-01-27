@@ -5224,8 +5224,8 @@
             // Put new data into the read queue.
             Generator.prototype._read = function(size){
               const self = this;
-              read(this.options, this.state, size, function() {
-                self.__push.apply(self, arguments);
+              read(this.options, this.state, size, function(chunk) {
+                self.__push(chunk);
               }, function(){
                 self.push(null);
               });
