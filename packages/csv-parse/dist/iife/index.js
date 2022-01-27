@@ -5557,7 +5557,7 @@ var csv_parse = (function (exports) {
               'utf16le': Buffer.from([255, 254])
             };
 
-            const transform = function(original_options, options, state, push) {
+            const transform = function(original_options, options, state) {
               const info = {
                 bytes: 0,
                 comment_lines: 0,
@@ -5567,7 +5567,6 @@ var csv_parse = (function (exports) {
                 records: 0
               };
               return {
-                push: push,
                 info: info,
                 original_options: original_options,
                 options: options,
@@ -5588,7 +5587,7 @@ var csv_parse = (function (exports) {
                   return numOfCharLeft < requiredLength;
                 },
                 // Central parser implementation
-                __parse: function(nextBuf, end){
+                __parse: function(nextBuf, end, push, close){
                   const {bom, comment, escape, from_line, ltrim, max_record_size, quote, raw, relax_quotes, rtrim, skip_empty_lines, to, to_line} = this.options;
                   let {record_delimiter} = this.options;
                   const {bomSkipped, previousBuf, rawBuffer, escapeIsQuote} = this.state;
@@ -5596,7 +5595,7 @@ var csv_parse = (function (exports) {
                   if(previousBuf === undefined){
                     if(nextBuf === undefined){
                       // Handle empty string
-                      this.push(null);
+                      close();
                       return;
                     }else {
                       buf = nextBuf;
@@ -5646,7 +5645,7 @@ var csv_parse = (function (exports) {
                     }
                     if(to_line !== -1 && this.info.lines > to_line){
                       this.state.stop = true;
-                      this.push(null);
+                      close();
                       return;
                     }
                     // Auto discovery of record_delimiter, unix, mac and windows supported
@@ -5767,11 +5766,11 @@ var csv_parse = (function (exports) {
                             const errField = this.__onField();
                             if(errField !== undefined) return errField;
                             this.info.bytes = this.state.bufBytesStart + pos + recordDelimiterLength;
-                            const errRecord = this.__onRecord();
+                            const errRecord = this.__onRecord(push);
                             if(errRecord !== undefined) return errRecord;
                             if(to !== -1 && this.info.records >= to){
                               this.state.stop = true;
-                              this.push(null);
+                              close();
                               return;
                             }
                           }
@@ -5842,7 +5841,7 @@ var csv_parse = (function (exports) {
                         this.info.bytes = this.state.bufBytesStart + pos;
                         const errField = this.__onField();
                         if(errField !== undefined) return errField;
-                        const errRecord = this.__onRecord();
+                        const errRecord = this.__onRecord(push);
                         if(errRecord !== undefined) return errRecord;
                       }else if(this.state.wasRowDelimiter === true){
                         this.info.empty_lines++;
@@ -5859,7 +5858,7 @@ var csv_parse = (function (exports) {
                     this.state.wasRowDelimiter = false;
                   }
                 },
-                __onRecord: function(){
+                __onRecord: function(push){
                   const {columns, group_columns_by_name, encoding, info, from, relax_column_count, relax_column_count_less, relax_column_count_more, raw, skip_records_with_empty_values} = this.options;
                   const {enabled, record} = this.state;
                   if(enabled === false){
@@ -5943,14 +5942,14 @@ var csv_parse = (function (exports) {
                         );
                         const err = this.__push(
                           objname === undefined ? extRecord : [obj[objname], extRecord]
-                        );
+                          , push);
                         if(err){
                           return err;
                         }
                       }else {
                         const err = this.__push(
                           objname === undefined ? obj : [obj[objname], obj]
-                        );
+                          , push);
                         if(err){
                           return err;
                         }
@@ -5965,14 +5964,14 @@ var csv_parse = (function (exports) {
                         );
                         const err = this.__push(
                           objname === undefined ? extRecord : [record[objname], extRecord]
-                        );
+                          , push);
                         if(err){
                           return err;
                         }
                       }else {
                         const err = this.__push(
                           objname === undefined ? record : [record[objname], record]
-                        );
+                          , push);
                         if(err){
                           return err;
                         }
@@ -6040,7 +6039,7 @@ var csv_parse = (function (exports) {
                   this.state.field.reset();
                   this.state.wasQuoting = false;
                 },
-                __push: function(record){
+                __push: function(record, push){
                   const {on_record} = this.options;
                   if(on_record !== undefined){
                     const info = this.__infoRecord();
@@ -6186,7 +6185,10 @@ var csv_parse = (function (exports) {
                   const err = typeof msg === 'string' ? new Error(msg) : msg;
                   if(skip_records_with_error){
                     this.state.recordHasError = true;
-                    this.emit('skip', err, raw ? this.state.rawBuffer.toString(encoding) : undefined);
+                    if(this.options.on_skip !== undefined){
+                      this.options.on_skip(err, raw ? this.state.rawBuffer.toString(encoding) : undefined);
+                    }
+                    // this.emit('skip', err, raw ? this.state.rawBuffer.toString(encoding) : undefined);
                     return undefined;
                   }else {
                     return err;
@@ -6229,11 +6231,11 @@ var csv_parse = (function (exports) {
               constructor(opts = {}){
                 super({...{readableObjectMode: true}, ...opts, encoding: null});
                 this.options = normalize_options(opts);
-                this.state = init_state(this.options);
-                const push = (record) => {
-                  this.push.call(this, record);
+                this.options.on_skip = (err, chunk) => {
+                  this.emit('skip', err, chunk);
                 };
-                this.api = transform(opts, this.options, this.state, push);
+                this.state = init_state(this.options);
+                this.api = transform(opts, this.options, this.state);
                 this.info = this.api.info;
               }
               // Implementation of `Transform._transform`
@@ -6241,7 +6243,11 @@ var csv_parse = (function (exports) {
                 if(this.state.stop === true){
                   return;
                 }
-                const err = this.api.__parse(buf, false);
+                const err = this.api.__parse(buf, false, (record) => {
+                  this.push.call(this, record);
+                }, () => {
+                  this.push.call(this, null);
+                });
                 if(err !== undefined){
                   this.state.stop = true;
                 }
@@ -6252,7 +6258,11 @@ var csv_parse = (function (exports) {
                 if(this.state.stop === true){
                   return;
                 }
-                const err = this.api.__parse(undefined, true);
+                const err = this.api.__parse(undefined, true, (record) => {
+                  this.push.call(this, record);
+                }, () => {
+                  this.push.call(this, null);
+                });
                 callback(err);
               }
             }
