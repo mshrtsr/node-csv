@@ -2071,7 +2071,7 @@ var csv_stringify_sync = (function (exports) {
                       key: column,
                       header: column
                     });
-                  }else if(typeof column === 'object' && column !== undefined && !Array.isArray(column)){
+                  }else if(typeof column === 'object' && column !== null && !Array.isArray(column)){
                     if(!column.key){
                       return [Error('Invalid column definition: property "key" is required')];
                     }
