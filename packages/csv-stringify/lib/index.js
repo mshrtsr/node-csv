@@ -8,7 +8,7 @@ additional information.
 
 import { Transform } from 'stream';
 import { CsvError } from './api/CsvError.js';
-import { is_object } from './api/is_object.js';
+import { is_object } from './utils/is_object.js';
 import { stringifier } from './api/index.js';
 import { normalize_options } from './api/normalize_options.js';
 

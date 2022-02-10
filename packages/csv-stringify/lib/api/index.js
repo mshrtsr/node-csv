@@ -1,6 +1,6 @@
 
-import { get } from './get.js';
-import { is_object } from './is_object.js';
+import { get } from '../utils/get.js';
+import { is_object } from '../utils/is_object.js';
 import { normalize_columns } from './normalize_columns.js';
 import { normalize_options } from './normalize_options.js';
 const bom_utf8 = Buffer.from([239, 187, 191]);
